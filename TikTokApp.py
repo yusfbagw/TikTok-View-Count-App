@@ -44,12 +44,12 @@ Ex. from fastapi.responses import HTMLResponses
 from fastapi.responses import RedirectResponse
 
 #This is just the sandbox key from tiktok, just a string basically.
-CLIENT_KEY = "aw5bxfl6pdbn6b6m"
+CLIENT_KEY = ""
 
 #This is the redirect uri, which is the url that TikTok will send you back to after you approve
 # or deny it access. Also just a string btw.
 
-REDIRECT_URI = "https://your-current-tunnel.trycloudflare.com/callback"
+REDIRECT_URI = ""
 
 #Think of FastAPI as a class
 # Like in java
@@ -65,7 +65,57 @@ def callback():
 #The @ makes this a decorator.
 @app.get("/login")
 def login():
-    return None
+    #This is going to create a random string for this login attempt.
+    #We need this because our callback address is public, i.e (/callback)
+    #We shouldn't accept a login response merely because it arrives there. 
+    state = secrets.token_urlsafe(32)
+
+    
+    #This is just a dictionary full of the instructions that TikTok will need
+    #The keys are the names that tiktok expects when you sent a request to it.
+    #The values are what 
+    parameters = {
+        #The client key this is the application requesting access.
+        "client_key": CLIENT_KEY,
+        #Returns a temporary authorization code after approval
+        #Sends a temp code to their email or whereever.
+        "response_type": "code",
+        #These just the scopes that we need 
+        "scope" : "user.info.basic, video.list",
+        #This is where we're going to redirect the user
+        "redirect_uri" : REDIRECT_URI,
+        #This state parameter is going to be the same random value when sending the browser back.
+        "state" : state,
+    }
+    #Here we're building a destination URL. The part where the user would click on it and see an 
+    # authorize or not page.
+    url = "https://www.tiktok.com/v2/auth/authorize/?" + urlencode(parameters)
+
+    #This creates a HTTP response that tells the browser to go to this url, on the redirect.
+    response = RedirectResponse(url)
+
+    #This is a cookie
+    """
+    
+    What we're doing here is basically we're creating a cookie.
+    
+    """
+    response.set_cookie(
+          #This is the cookies name: oauth_state
+          "oauth_state",
+          #State is its value
+          state,
+          #httponly prevents javascript running in the browser from accessing it through document.cookie.
+          httponly=True,
+          #Only sends the cookie over HTTPs, doesn't send it over an ordinary HTTP connection.
+          secure=True,
+          #This permits the cookie while restricting other cross site requests
+          #Good for security. 
+          samesite="lax",
+          #max age in seconds
+          max_age = 600
+    )
+    return response
 
 @app.get("/easter-egg")
 #The name of the function doesn't matter as long as its below the path.
